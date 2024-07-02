@@ -4,13 +4,13 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { upload_On_Cloudinary, delete_From_Cloudinary }  = require("../utils/cloudinary");
 const fs = require("fs");
+const validator = require("validator");
 
 //cookie options
 const options = {
     httpOnly:true,
     sameSite:"None",
-    path:"/",
-    secure:true //not allowing to get cookies via req.cookies when using thunderclient so remove it while testing but for chrome it is needed
+    //secure:true //not allowing to get cookies via req.cookies when using thunderclient so remove it while testing but for chrome it is needed
 }
 
 //custom funcn for generating tokens(both) ---> because we will use this funcn often
@@ -37,8 +37,7 @@ const generate_Access_And_Refresh_Tokens = async (userid) => {
 }
 
 
-
-const register_User =async ( req,res ) => {
+const register_User = async ( req,res ) => {
     // get user details from frontend
     // validation - not empty
     // check if user already exists: username, email
@@ -48,15 +47,26 @@ const register_User =async ( req,res ) => {
     // remove password and refresh token field from response
     // check for user creation
     // return res
-
-
     try 
     {
         const { username , fullname, email, password } = req.body;
         //check empty fields
         if( !username || !password || !email || !fullname)  return res.status(400).json({ message: " all fields are required. " }) 
+
         //@ in  email
-        if( !email.includes("@") )  return res.status(400).json({ message: " please enter a valid email. " }) 
+        // if( !email.includes("@") )  return res.status(400).json({ message: " please enter a valid email. " }) 
+        //better method 👇
+        if (!validator.isEmail(email)) 
+        {
+            return res.status(400).json({ message: 'Invalid email address' });
+        }
+    
+        // Validate username 
+        if (!/^[a-zA-Z0-9_]+$/.test(username))   
+        {   //not even spaces
+            return res.status(400).json({ message: 'Invalid username! Only letters, numbers, and underscores are allowed.' });
+        }
+
         //check duplicacy
         const existingUser = await User.findOne({
             $or: [  //these $or ...... are mongoDB operators 
@@ -84,9 +94,7 @@ const register_User =async ( req,res ) => {
         //encrypt the password
         // const hashedPassword = await bcrypt.hash( password, 10 );     no need now (pre-hook)
     
-
         // for uploading the files firstly get their local paths given by multer. 
-
         //avatar
         if(!req.files.avatar) 
         {
@@ -103,23 +111,17 @@ const register_User =async ( req,res ) => {
         if(!avatar) return res.status(500).json({ message: "file not uploaded on cloudinary." });
         //get the url
         const avatar_url = avatar.url;
-        
         //coverImage
-        if(!req.files.coverImage) 
+        let coverImageLocalPath = "";            
+        let coverImage_url = "";   
+        if(req.files.coverImage) 
         { 
-            var coverImageLocalPath = "";            //don't return 
-            var coverImage_url = "";               // although we just needed to set this 
-        }    
-        else  
-        {
-            coverImageLocalPath = req.files.coverImage[0].path ;    // for global scope we declared it as var
+            coverImageLocalPath = req.files.coverImage[0].path ; 
             if(!coverImageLocalPath) return res.status(500).json({ message: "multer not returning the path correctly." })
-            var coverImage = await upload_On_Cloudinary( coverImageLocalPath );
-            //check if uploaded correctly or not on cloudinary
+            coverImage = await upload_On_Cloudinary(coverImageLocalPath);
             if(!coverImage) return res.status(500).json({ message: "coverImage not uploaded on cloudinary correctly for cover image." });
-            //get the url
             coverImage_url = coverImage.url;
-        }
+        }   
 
         //create entry 
         const user = await User.create(/*data*/
@@ -152,30 +154,27 @@ const login_User =async ( req,res ) =>{
     //password check
     //access and referesh token
     //send cookie
-
-
     try 
     {
-        const { username , email, password } = req.body;
+        const { loginInput, password } = req.body;
 
         //check empty fields   //or  !(username || email)
-        if( ( !username && !email ) || !password )  return res.status(400).json({ message: " username/email & password is required. " }) 
-        
-        //@ in  email only if we have email 
-        if(email)
-        { if( !email.includes("@") )  return res.status(400).json({ message: " please enter a valid email. " }) }
-        
+        if( !loginInput || !password )  return res.status(400).json({ message: "Both feilds are required." }) 
+                
         //find user ( can just use username or email)
-        const user = await User.findOne({          //now user not User will be used to call any custom methods or save()
-           $or: [ 
-            {
-                username: username.trim().toLowerCase()
-            },
-            { 
-                email: email.trim().toLowerCase()
-            } 
-        ]
-        });
+        // const user = await User.findOne({          //now user not User will be used to call any custom methods or save()
+        //    $or: [ 
+        //     {
+        //         username: username.trim().toLowerCase()
+        //     },
+        //     { 
+        //         email: email.trim().toLowerCase()
+        //     } 
+        // ]
+        // });
+        /* better method 👇 */
+        const isEmail = validator.isEmail(loginInput)
+        const user = isEmail ? await User.findOne({email: loginInput.trim().toLowerCase()}) : await User.findOne({username: loginInput.trim().toLowerCase()})
         if(!user) return res.status(404).json({ message: `user not found.` })
     
         //validate the password
@@ -185,7 +184,7 @@ const login_User =async ( req,res ) =>{
         //now password is validated so generate access and refresh tokens
         const { accessToken,refreshToken } = await generate_Access_And_Refresh_Tokens(user._id);
     
-        const loggedInUser =await  User.findById(user._id).select( "-password -refreshToken" );
+        const loggedInUser = await User.findById(user._id).select( "-password -refreshToken" );
     
         //cookies ( options on top global scope )
         return res
@@ -320,6 +319,11 @@ const update_Account_Details = async ( req,res ) => {
         if( !fullname || !email || !password ) 
         return res.status(400).json({ message: "please fill all the required fields." });
     
+        if (!validator.isEmail(email)) 
+        {
+            return res.status(400).json({ message: 'Invalid email address' });
+        }
+
         const user = await User.findByIdAndUpdate(
             req.user?._id,
             {
@@ -412,138 +416,154 @@ const update_Avatar = async ( req,res ) => {
 
 const get_Channel_Profile = async ( req,res ) => {
     
-    const { username } = req.params;
-    if(!username?.trim()) return res.status(400).json({ message: "username is missing." })
-
-    //setting the pipelines
-    const channel = await User.aggregate([
-        //stage 1 ===> finding the required user specified by url params
-        {
-            $match: { username: username.trim().toLowerCase() }
-        },
-        //stage2 ===> adding the followers field to it 
-        {
-            $lookup:
+    try {
+        const { username } = req.params;
+        if(!username?.trim()) return res.status(400).json({ message: "username is missing." })
+    
+        //setting the pipelines
+        const channel = await User.aggregate([
+            //stage 1 ===> finding the required user specified by url params
             {
-                from:"subscriptions",
-                localField:"_id",
-                foreignField:"channel",
-                as:"subscribers"             //array of objects
-            }
-        },
-        //stage3 ===> finding the channels this user has subscribed
-        {
-            $lookup:
+                $match: { username: username.trim().toLowerCase() }
+            },
+            //stage2 ===> adding the followers field to it 
             {
-                from:"subscriptions",
-                localField:"_id",
-                foreignField:"subscriber",
-                as:"subscribedTo"           //array of objects
-            }
-        },
-        //stage4 ==> adding the count fields
-        {
-            $addFields:
-            {
-                subscribersCount:{ $size:"$subscribers" },
-                subscribedToCount:{ $size:"$subscribedTo" },
-                isSubscribed: //boolean(whether to show subscribe button or subscribed)
+                $lookup:
                 {
-                    $cond:
+                    from:"subscriptions",
+                    localField:"_id",
+                    foreignField:"channel",
+                    as:"subscribers"             //array of objects
+                }
+            },
+            //stage3 ===> finding the channels this user has subscribed
+            {
+                $lookup:
+                {
+                    from:"subscriptions",
+                    localField:"_id",
+                    foreignField:"subscriber",
+                    as:"subscribedTo"           //array of objects
+                }
+            },
+            //stage4 ==> adding the count fields
+            {
+                $addFields:
+                {
+                    subscribersCount:{ $size:"$subscribers" },
+                    subscribedToCount:{ $size:"$subscribedTo" },
+                    isSubscribed: //boolean(whether to show subscribe button or subscribed)
                     {
-                        if:{ $in:[ req.user._id, "$subscribers.subscriber" ] },             // the subscriber is nothing but the id as its value so these are direclty getting matched here
-                        then: true,
-                        else: false
+                        $cond:
+                        {
+                            if:{ $in:[ req.user._id, "$subscribers.subscriber" ] },             // the subscriber is nothing but the id as its value so these are direclty getting matched here
+                            then: true,
+                            else: false
+                        }
                     }
                 }
-            }
-        },
-        //stage5 ==> we want to send selected fields in return to the const channel
-        {
-            $project:
+            },
+            //stage5 ==> we want to send selected fields in return to the const channel
             {
-                username: 1,
-                fullname: 1,
-                avatar: 1,
-                coverImage: 1,
-                subscribedToCount: 1,
-                subscribersCount: 1,
-                isSubscribed: 1
+                $project:
+                {
+                    username: 1,
+                    fullname: 1,
+                    avatar: 1,
+                    coverImage: 1,
+                    subscribedToCount: 1,
+                    subscribersCount: 1,
+                    isSubscribed: 1
+                }
             }
-        }
-    ])
-     
-    //we will get the array of all the matched users(objects/docs) but here in this case it will be only one since unique username
-    //console.log(channel);
-
-    if(!channel?.length) return res.status(404).json({ message:"channel doesn't exist" });
-
-    return res.status(200).json({channel: channel[0] ,message:"channel fetched successfully" });
+        ])
+         
+        //we will get the array of all the matched users(objects/docs) but here in this case it will be only one since unique username
+        //console.log(channel);
+    
+        if(!channel?.length) return res.status(404).json({ message:"channel doesn't exist" });
+    
+        return res.status(200).json({channel: channel[0] ,message:"channel fetched successfully" });
+    } 
+    catch (err) 
+    {
+        return res.status(500).json({message:"something bad happened while getting the channel profile",err})     
+    }
 }
 
 const get_watch_history = async ( req,res ) => {
     
-    //pipelines
-    const user = await User.aggregate([/*pipeline*/
-        //stage  
-        {
-            $match:
+    try {
+        //pipelines
+        const user = await User.aggregate([/*pipeline*/
+            //stage  
             {
-                _id: new mongoose.Types.ObjectId(req.user._id)        //because these are mongodb oprs so no auto conversion by mongoose
-            } 
-        },
-        //stage
-        {
-            $lookup:
-            {                // will return the user populated with watchHistory array having all detailed video objects 
-                from:"videos",
-                localField:"watchHistory",
-                foreignField:"_id",
-                as:"watchHistory",            //overwrite
-                //sub-pipeline, we can use sub-pipeline option for every lookup
-                pipeline:
-                [                    //it will populate the owner field and return the video details
-                    //sub-stage
-                    {
-                        $lookup:
-                        {          //this will populate the owner field but will be an array having one object[0] but we dont to use[0] so we can use addfields to overwrite
-                            from:"users",
-                            localField:"owner",
-                            foreignField:"_id", 
-                            as:"owner",
-                            //sub-pipeline
-                            pipeline:
-                            [        // so jb ye lookup owner field mein data paste krega toh partial hi krega becuase we don't need everything about the user 
-                                //sub-stage
-                                {
-                                    $project:
-                                    {
-                                        fullname: 1,
-                                        username: 1,
-                                        avatar: 1
-                                    }
-                                }
-                            ]              //overwrite
-                        }
-                    },// can add more sub pipelines here now to specify the str of the video owner output becuase right now the pipeline was about to populate the owner field as array where[0] has the object having firstname and stuff.....
-                    {
-                        $addFields:
+                $match:
+                {
+                    _id: new mongoose.Types.ObjectId(req.user._id)        //because these are mongodb oprs so no auto conversion by mongoose
+                } 
+            },
+            //stage
+            {
+                $lookup:
+                {                // will return the user populated with watchHistory array having all detailed video objects 
+                    from:"videos",
+                    localField:"watchHistory",
+                    foreignField:"_id",
+                    as:"watchHistory",            //overwrite
+                    //sub-pipeline, we can use sub-pipeline option for every lookup
+                    pipeline:
+                    [                    //it will populate the owner field and return the video details
+                        //sub-stage
                         {
-                            owner:
-                            {      //overwrite******
-                                $first: "$owner"                    // other syntax $arrayElemAt: [" $owner ",0]
+                            $lookup:
+                            {          //this will populate the owner field but will be an array having one object[0] but we dont to use[0] so we can use addfields to overwrite
+                                from:"users",
+                                localField:"owner",
+                                foreignField:"_id", 
+                                as:"owner",
+                                //sub-pipeline
+                                pipeline:
+                                [        // so jb ye lookup owner field mein data paste krega toh partial hi krega becuase we don't need everything about the user 
+                                    //sub-stage
+                                    {
+                                        $project:
+                                        {
+                                            fullname: 1,
+                                            username: 1,
+                                            avatar: 1
+                                        }
+                                    }
+                                ]              //overwrite
+                            }
+                        },// can add more sub pipelines here now to specify the str of the video owner output becuase right now the pipeline was about to populate the owner field as array where[0] has the object having firstname and stuff.....
+                        {
+                            $addFields:
+                            {
+                                owner:
+                                {      //overwrite******
+                                    $first: "$owner"                    // other syntax $arrayElemAt: [" $owner ",0]
+                                },
+                                views:
+                                {
+                                    $size:"$views"
+                                }
                             }
                         }
-                    }
-
-                ]  
-            }
-        }// we dont want to format this becuase we want array only and it has multiple elements ( video objects ) not only at[0] 
-        //but could have used project here if want to decide what fields in the user model to send 
-    ])
-
-    //here we are just sending history using dot
-    return res.status(200).json({watchHistory: user[0].watchHistory ,message:"watch history fetched successfully"});
+    
+                    ]  
+                }
+            }// we dont want to format this becuase we want array only and it has multiple elements ( video objects ) not only at[0] 
+            //but could have used project here if want to decide what fields in the user model to send 
+        ])
+    
+        //here we are just sending history using dot
+        return res.status(200).json({watchHistory: user[0].watchHistory ,message:"watch history fetched successfully"});
+    } 
+    catch (err) 
+    {
+        return res.status(500).json({message:"something bad happened while getting the watch history",err})    
+    }
 }
 
 

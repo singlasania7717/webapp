@@ -27,11 +27,12 @@ const videoSchema = new mongoose.Schema({
         type:String,                //cloudinary url
         required:true
     },
-    views:{
-        type:Number,
-        required:true,
-        default:0
-    },
+    views:[
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        }
+    ],
     // isPublished:{
     //     type:Boolean,
     //     required:true
@@ -41,14 +42,14 @@ const videoSchema = new mongoose.Schema({
 
 
 
-videoSchema.methods.increment_Views = function() {
-    this.views += 1;
-    return this.save({ validateBeforeSave:false });
+videoSchema.methods.increment_Views = async function (userid) {
+    if(this.views.includes(userid)) return "true";
+    this.views.push(userid);
+    return this.save({validateBeforeSave:false});
 }
 
-
-
 videoSchema.plugin(mongooseAggregatePaginate)
+
 
 const Video = mongoose.model( "Video",videoSchema );
 module.exports = Video;

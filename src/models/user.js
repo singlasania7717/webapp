@@ -7,16 +7,18 @@ const userSchema = new mongoose.Schema( {
     username:
     {
         type:String,
-        required:true,                // this is a validation
-        unique:true,                  // will show error in console 
+        required:true,       // this is a validation
+        unique:true,         // will show error in console 
         index:true,
-        trim:true                     // will auto trim the white spaces on start and end 
+        trim:true,         // will auto trim the white spaces on start and end so while comparing also do .trim()
+        lowercase:true     //to convert some stuff to lowercase before saving toh match vgera krte time bhi unko lowercase mein convert krke match krna
     },
     fullname:
     {
         type:String,
         required:true,
-        trim:true
+        trim:true,
+        lowercase:true
     },
     avatar:{
         type:String,
@@ -42,7 +44,8 @@ const userSchema = new mongoose.Schema( {
         type:String,
         required:true,
         unique:true,
-        trim:true
+        trim:true,
+        lowercase:true
     },
     refreshToken:
     {
@@ -60,14 +63,6 @@ userSchema.pre( "save",async function(next){                  // create method i
     next();
 })
 
-//to convert some stuff to lowercase before saving toh match vgera krte time bhi unko lowercase mein convert krke match krna
-userSchema.pre("save", async function(next){
-    if(!this.isModified("fullname") && !this.isModified("username") && !this.isModified("email")) return next();
-    this.fullname = this.fullname.toLowerCase();
-    this.username = this.username.toLowerCase();
-    this.email = this.email.toLowerCase();
-    next(); 
-})
 
 
 // userSchema.methods.isPasswordValid = async function(password){              or we just defined at the use time as in login controller
@@ -105,7 +100,7 @@ userSchema.methods.generate_refresh_token = function() {          // we dont def
 }
 
 
-userSchema.methods.updateWatchHistory = function(videoid) {
+userSchema.methods.updateWatchHistory = async function (videoid) {
     if(this.watchHistory.includes(videoid)) return ;
     this.watchHistory.push(videoid);
     return this.save({validateBeforeSave:false});

@@ -1,7 +1,3 @@
-const express = require("express");
-const videoRouter = express.Router();
-const upload = require("../middleware/multer");
-const verifyJWT = require("../middleware/authorize");
 const {   
     get_All_Videos,
     publish_a_Video,
@@ -10,9 +6,13 @@ const {
     get_Video_By_Id
 } = require("../controllers/video_controller");
 
+const express = require("express");
+const videoRouter = express.Router();
+const upload = require("../middleware/multer");
+const verifyJWT = require("../middleware/authorize");
 
-//all are secured routes
-videoRouter.use(verifyJWT);
+
+videoRouter.use(verifyJWT);           //all are secured routes
 
 
 videoRouter.route("/")

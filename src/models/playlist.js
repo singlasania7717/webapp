@@ -11,12 +11,12 @@ const playlistSchema = new mongoose.Schema({
             ref:"Video"
         }
     ],
-    discription:{
-        type:string,
+    description:{
+        type:String,
         required:true
-    },
+    },  
     name:{
-        type:string,
+        type:String,
         required:true
     }
 

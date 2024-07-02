@@ -36,11 +36,24 @@ app.use(cookieParser());
 //route importing
 const userRouter = require("./routes/users");
 const videoRouter = require("./routes/videos");
+const likeRouter = require("./routes/likes");
+const commentRouter = require("./routes/comments");
+const tweetRouter = require("./routes/tweets");
+const subscriptionRouter = require("./routes/subscriptions");
+const playlistRouter = require("./routes/playlists");
+const healthRouter = require("./routes/healthcheck");
+const dashboardRouter = require("./routes/dashboard");
 
 
 app.use("/api/v1/users",userRouter);
 app.use("/api/v1/videos",videoRouter);
-
+app.use("/api/v1/likes",likeRouter);
+app.use("/api/v1/comments",commentRouter);
+app.use("/api/v1/tweets",tweetRouter);
+app.use("/api/v1/subscriptions",subscriptionRouter);
+app.use("/api/v1/playlists",playlistRouter);
+app.use("/api/v1/healthCheck",healthRouter);
+app.use("/api/v1/dashboard",dashboardRouter);
 
 
 

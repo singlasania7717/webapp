@@ -7,11 +7,11 @@ const commentSchema = new mongoose.Schema({
         type:String,
         required:true
     },  
-    commentBy:{                 // as soon as user make a new comment on a video we will set his id to its value and then use lookup to get full data  
+    commentBy:{            // as soon as user make a new comment on a video we will set his id to its value and then use lookup to get full data  
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     },
-    video:{                 // as soon as user make a new comment on a video we will set the video id to its value and then use lookup to get full data 
+    video:{               // as soon as user make a new comment on a video we will set the video id to its value and then use lookup to get full data 
         type: mongoose.Schema.Types.ObjectId,
         ref: "Video"
     }
